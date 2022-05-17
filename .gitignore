@@ -30,3 +30,13 @@
 *.exe
 *.out
 *.app
+
+# build output
+build/
+
+# binary output
+OrderMatchingSimulator/
+
+# editor setting
+.vscode/
+
