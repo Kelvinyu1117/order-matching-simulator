@@ -2,6 +2,7 @@ cmake_minimum_required(VERSION 3.14.0)
 
 include_directories(
     "${OrderMatchingSimulator_SOURCE_DIR}/include"
+    "${OrderMatchingSimulator_SOURCE_DIR}/include"
 )
 
 subdirs(order_book matching_engine)
