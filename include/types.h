@@ -1,14 +1,14 @@
-#ifndef COMMON
-#define COMMON
+#ifndef COMMON_TYPES
+#define COMMON_TYPES
 #include <cstdint>
-#include <string_view>
+#include <string>
 namespace Common {
-enum class OrderType {
-  MKT_ORDER,
-  LIMIT_ORDER,
-};
+// enum class MatchingStatus {
+//   FILL,
+//   CANCEL,
+//   REJECTED,
+// };
 
-enum class Side { BUY, SELL };
 /**
  * @brief
  * Assume the price will be int64_t for easy implementation.
@@ -18,8 +18,9 @@ enum class Side { BUY, SELL };
  */
 using Price = std::int64_t;
 using Quantity = std::uint64_t;
-using Symbol = std::string_view;
+using Symbol = std::string;
 using OrderId = std::uint64_t;
-using ClientId = std::string_view;
+using TraderId = std::string;
+
 } // namespace Common
 #endif

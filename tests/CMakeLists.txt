@@ -12,9 +12,14 @@ enable_testing()
 add_executable(
     OrderMatchingSimulatorTest
     test_matching_engine.cpp
+    test_order_book.cpp
 )
 
 target_link_libraries(OrderMatchingSimulatorTest matching_engine order_book gtest_main)
+target_include_directories(OrderMatchingSimulatorTest PUBLIC "${OrderMatchingSimulator_SOURCE_DIR}/include")
+target_include_directories(OrderMatchingSimulatorTest PUBLIC "${OrderMatchingSimulator_SOURCE_DIR}/lib/core")
+
+
 
 include(GoogleTest)
 gtest_discover_tests(
