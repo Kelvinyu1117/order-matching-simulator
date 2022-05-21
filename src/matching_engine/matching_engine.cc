@@ -86,21 +86,27 @@ bool MatchingEngine::matchSellOrder(ExecutionContext &context,
                                     std::unique_ptr<OrderBook> &bookPtr,
                                     Order<Side::SELL> &order) {
 
+  bool should_proceed = true;
+  if (mConfig && mConfig->selfTradPreventionConfig &&
+      mConfig->selfTradPreventionConfig->enable) {
+  }
+
   if (bookPtr->template getNumOfLevels<Side::BUY>() == 0) {
     return false;
   }
 
   auto it = bookPtr->template begin<Side::BUY>();
+  auto best_bid = it->first;
   auto px = order.getPrice();
   auto amt = order.getQuantity();
 
-  if (px > it->first) {
+  if (px > best_bid) {
     return false;
   }
 
   bool is_done = false;
 
-  while (!is_done && px <= it->first &&
+  while (!is_done && px <= best_bid &&
          it != bookPtr->template end<Side::BUY>()) {
     auto &orderQueue = it->second;
 

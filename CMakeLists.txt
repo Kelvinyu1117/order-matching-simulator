@@ -7,6 +7,6 @@ set(CMAKE_INSTALL_PREFIX "${OrderMatchingSimulator_SOURCE_DIR}/OrderMatchingSimu
 set(CMAKE_C_STANDARD 99)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_BUILD_TYPE Debug)
-set(CMAKE_CXX_FLAGS_INIT "-Werror -Wall -Wextra -Wpedantic")
+set(CMAKE_CXX_FLAGS_INIT "-Wall -Wextra -Wpedantic -Werror")
 
 subdirs(src tests lib)
