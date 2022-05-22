@@ -1,2 +1,2 @@
 cmake_minimum_required(VERSION 3.14.0)
-subdirs(order_book execution_context self_trade_handler)
+subdirs(order_book execution_context)

@@ -67,6 +67,44 @@ public:
     return isFound;
   }
 
+  bool erase(OrderId orderId) {
+    bool isFound = false;
+    auto it = mQueue.begin();
+
+    for (; it != mQueue.end() && !isFound; ++it) {
+      if (it->getOrderId() == orderId) {
+        isFound = true;
+      }
+    }
+
+    if (isFound) {
+      mTraderIds.erase(it->getTraderId());
+      mQueue.erase(it);
+      mTotalQuantity -= it->getQuantity();
+    }
+
+    return isFound;
+  }
+
+  bool erase(OrderId orderId, TraderId traderId) {
+    bool isFound = false;
+    auto it = mQueue.begin();
+
+    for (; it != mQueue.end() && !isFound; ++it) {
+      if (it->getOrderId() == orderId && it->getTraderId() == traderId) {
+        isFound = true;
+      }
+    }
+
+    if (isFound) {
+      mTraderIds.erase(it->getTraderId());
+      mQueue.erase(it);
+      mTotalQuantity -= it->getQuantity();
+    }
+
+    return isFound;
+  }
+
   bool contains(TraderId id) { return mTraderIds.find(id) != mTraderIds.end(); }
   bool empty() const { return mQueue.empty(); }
 
@@ -133,6 +171,23 @@ public:
     } else {
       return mAskSide.end();
     }
+  }
+
+  bool removeOrder(OrderId orderId, TraderId traderId) {
+    bool isFound = false;
+
+    // Definitely it can be optimized by manipulating the reference of the order
+    // in the queue and orderId and traderId, something like a multi-index
+    // (OrderId, TraderId) to the order, but I dont have time to do it yet
+    for (auto it = mBidSide.begin(); it != mBidSide.end() && isFound; ++it) {
+      isFound = it->second.erase(orderId, traderId);
+    }
+
+    for (auto it = mAskSide.begin(); it != mAskSide.end() && isFound; ++it) {
+      isFound = it->second.erase(orderId, traderId);
+    }
+
+    return isFound;
   }
 
   template <Side side> auto search(Price px) {

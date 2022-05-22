@@ -9,9 +9,15 @@ enum class OrderStyle {
   LIMIT_ORDER,
 };
 
+enum class OrderStatus { OPEN, FILLED, CANCEL, CANCEL_REJECT };
+
 enum class Side { BUY, SELL };
 
-struct OrderCancelRequest {};
+struct OrderCancelRequest {
+  OrderId mOrderId;
+  Symbol mSymbol;
+  TraderId mTraderId;
+};
 
 template <Side side> class Order;
 

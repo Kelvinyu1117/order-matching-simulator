@@ -1,10 +1,11 @@
 #ifndef MATCHING_ENGINE
 #define MATCHING_ENGINE
+#include "self_trade_handler.h"
 #include <atomic>
-#include <execution_context/execution_context.h>
+#include <core/execution_context/execution_context.h>
+#include <core/order_book/order_book.h>
 #include <memory>
 #include <order.h>
-#include <order_book/order_book.h>
 #include <types.h>
 #include <unordered_map>
 #include <utility>
@@ -12,17 +13,6 @@
 
 using namespace Common;
 using namespace Core;
-
-enum class SelfTradePreventionPolicy {
-  CANCEL_PASSIVE,
-  CANCEL_ACTIVE,
-  CANCEL_BOTH
-};
-
-struct SelfTradePreventionConfig {
-  bool enable;
-  SelfTradePreventionPolicy policy;
-};
 
 struct MatchingEngineConfig {
   std::optional<SelfTradePreventionConfig> selfTradPreventionConfig;
@@ -77,8 +67,20 @@ class MatchingEngine {
     return insert_limit_order<side>(context, traderId, symbol, price, quantity);
   }
 
-  OrderId cancel(ExecutionContext &context,
-                 const OrderCancelRequest &cancelRequest);
+  void cancel(ExecutionContext &context,
+              const OrderCancelRequest &cancelRequest) {
+
+    bool isCancelled = mBookMap[cancelRequest.mSymbol]->removeOrder(
+        cancelRequest.mOrderId, cancelRequest.mTraderId);
+
+    if (isCancelled) {
+      context.notifyTrader<OrderStatus::CANCEL>(cancelRequest.mTraderId,
+                                                cancelRequest.mOrderId);
+    } else {
+      context.notifyTrader<OrderStatus::CANCEL_REJECT>(cancelRequest.mTraderId,
+                                                       cancelRequest.mOrderId);
+    }
+  }
 
   const std::unordered_map<std::string, std::unique_ptr<OrderBook>> &
   getOrderBookMap();
@@ -125,6 +127,8 @@ private:
   bool matchSellOrder(ExecutionContext &context,
                       std::unique_ptr<OrderBook> &bookPtr,
                       Order<Side::SELL> &order);
+
+  bool isSelfTradePreventionEnable();
 
 private:
   std::atomic<OrderId> mOrderId{0};
