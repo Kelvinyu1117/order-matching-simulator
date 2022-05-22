@@ -12,12 +12,11 @@ using namespace Common;
 using namespace Core;
 
 /**
- * @todo
- *  add multiple handler for different policies
- *  return a flag to indicate is there any self-trade happen -> if it has been
- * handled, dont match
+ * @brief
+ * CANCEL_PASSIVE: cancel the existing order
+ * CANCEL_ACTIVE: cancel the incoming order
+ * CANCEL_BOTH: cancel both existing order and incoming order
  */
-
 enum class SelfTradePreventionPolicy {
   CANCEL_PASSIVE,
   CANCEL_ACTIVE,
