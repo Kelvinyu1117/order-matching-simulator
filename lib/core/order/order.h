@@ -2,12 +2,25 @@
 #define COMMON_ORDER
 #include <types.h>
 
-namespace Common {
+using namespace Common;
+
+namespace Core {
 
 enum class OrderStyle {
   MKT_ORDER,
   LIMIT_ORDER,
 };
+
+enum class OrderCancelReason {
+  CANCEL_REQUEST,
+  SELF_TRADE,
+  NO_ORDER_TO_MATCH_MKT_ORDER,
+  NONE,
+};
+
+std::string orderCancelReason2Str(OrderCancelReason rsn);
+
+std::string orderStyle2Str(OrderStyle style);
 
 enum class OrderStatus { OPEN, FILLED, CANCEL, CANCEL_REJECT };
 
@@ -54,6 +67,8 @@ public:
   Price getPrice() const { return mPrice; }
   Quantity getQuantity() const { return mQuantity; }
   void setQuantity(Quantity quantity) { mQuantity = quantity; }
+  void setPrice(Price price) { mPrice = price; }
+
   friend bool operator==<side>(const Order<side> &a, const Order<side> &b);
 
   friend bool operator!=<side>(const Order<side> &a, const Order<side> &b);
@@ -68,6 +83,6 @@ private:
   Quantity mQuantity;
 };
 
-} // namespace Common
+} // namespace Core
 
 #endif

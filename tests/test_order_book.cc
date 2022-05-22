@@ -1,6 +1,6 @@
 #include "gtest/gtest.h"
-#include <order.h>
-#include <order_book/order_book.h>
+#include <core/order/order.h>
+#include <core/order_book/order_book.h>
 #include <types.h>
 
 using namespace Common;
@@ -202,7 +202,7 @@ TEST_F(OrderBookTest, TestDifferentTraderAskOrderInsertionSamePriceLevel) {
   EXPECT_EQ(best_ask_iter->second.empty(), true);
 }
 
-TEST_F(OrderBookTest, TestBidOrderRemoval) {
+TEST_F(OrderBookTest, TestBidOrderLevelRemoval) {
   Order<Side::BUY> buyOrder1(OrderStyle::LIMIT_ORDER, mTrader1Id, 0, "ABC", 100,
                              10);
   mOrderbook.insert<Side::BUY>(buyOrder1);
@@ -217,7 +217,7 @@ TEST_F(OrderBookTest, TestBidOrderRemoval) {
   EXPECT_EQ(best_bid_iter, mOrderbook.end<Side::BUY>());
 }
 
-TEST_F(OrderBookTest, TestAskOrderRemoval) {
+TEST_F(OrderBookTest, TestAskOrderLevelRemoval) {
   Order<Side::SELL> sellOrder1(OrderStyle::LIMIT_ORDER, mTrader1Id, 0, "ABC",
                                100, 10);
   mOrderbook.insert<Side::SELL>(sellOrder1);
@@ -230,6 +230,56 @@ TEST_F(OrderBookTest, TestAskOrderRemoval) {
   best_ask_iter = mOrderbook.erase(best_ask_iter);
   EXPECT_EQ(mOrderbook.getNumOfLevels<Side::SELL>(), 0);
   EXPECT_EQ(best_ask_iter, mOrderbook.end<Side::SELL>());
+}
+
+TEST_F(OrderBookTest, TestBidOrderRemoval) {
+  Order<Side::BUY> buyOrder1(OrderStyle::LIMIT_ORDER, mTrader1Id, 0, "ABC", 100,
+                             10);
+  Order<Side::BUY> buyOrder2(OrderStyle::LIMIT_ORDER, mTrader2Id, 1, "ABC", 100,
+                             50);
+  Order<Side::BUY> buyOrder3(OrderStyle::LIMIT_ORDER, mTrader3Id, 2, "ABC", 100,
+                             60);
+
+  mOrderbook.insert<Side::BUY>(buyOrder1);
+  mOrderbook.insert<Side::BUY>(buyOrder2);
+  mOrderbook.insert<Side::BUY>(buyOrder3);
+
+  EXPECT_EQ(mOrderbook.getNumOfLevels<Side::BUY>(), 1);
+  auto best_bid_iter = mOrderbook.begin<Side::BUY>();
+  EXPECT_EQ(best_bid_iter->first, 100);
+  EXPECT_EQ(best_bid_iter->second.front(), buyOrder1);
+  EXPECT_EQ(best_bid_iter->second.totalQuantity(), 120);
+
+  bool success = mOrderbook.removeOrder(1, mTrader2Id);
+  EXPECT_EQ(success, true);
+  EXPECT_EQ(mOrderbook.getNumOfLevels<Side::BUY>(), 1);
+  EXPECT_EQ(best_bid_iter->second.front(), buyOrder1);
+  EXPECT_EQ(best_bid_iter->second.totalQuantity(), 70);
+}
+
+TEST_F(OrderBookTest, TestAskOrderRemoval) {
+  Order<Side::SELL> sellOrder1(OrderStyle::LIMIT_ORDER, mTrader1Id, 0, "ABC",
+                               100, 10);
+  Order<Side::SELL> sellOrder2(OrderStyle::LIMIT_ORDER, mTrader2Id, 1, "ABC",
+                               100, 50);
+  Order<Side::SELL> sellOrder3(OrderStyle::LIMIT_ORDER, mTrader3Id, 2, "ABC",
+                               100, 60);
+
+  mOrderbook.insert<Side::SELL>(sellOrder1);
+  mOrderbook.insert<Side::SELL>(sellOrder2);
+  mOrderbook.insert<Side::SELL>(sellOrder3);
+
+  EXPECT_EQ(mOrderbook.getNumOfLevels<Side::SELL>(), 1);
+  auto best_ask_iter = mOrderbook.begin<Side::SELL>();
+  EXPECT_EQ(best_ask_iter->first, 100);
+  EXPECT_EQ(best_ask_iter->second.front(), sellOrder1);
+  EXPECT_EQ(best_ask_iter->second.totalQuantity(), 120);
+
+  bool success = mOrderbook.removeOrder(0, mTrader1Id);
+  EXPECT_EQ(success, true);
+  EXPECT_EQ(mOrderbook.getNumOfLevels<Side::SELL>(), 1);
+  EXPECT_EQ(best_ask_iter->second.front(), sellOrder2);
+  EXPECT_EQ(best_ask_iter->second.totalQuantity(), 110);
 }
 
 TEST_F(OrderBookTest, TestBidOrderSearch) {

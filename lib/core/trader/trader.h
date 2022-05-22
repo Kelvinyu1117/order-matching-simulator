@@ -1,19 +1,21 @@
 #ifndef COMMON_TRADER
 #define COMMON_TRADER
-#include "order.h"
 #include "types.h"
 #include <iostream>
 #include <list>
+#include <order/order.h>
 #include <string>
 #include <unordered_map>
 #include <vector>
-namespace Common {
 
+using namespace Common;
+
+namespace Core {
 template <Side side> class Order;
 class Trader {
 public:
   Trader() = default;
-  Trader(std::string traderId);
+  Trader(std::string traderId) : mTraderId(traderId){};
   Trader(const Trader &other) = default;
   Trader &operator=(const Trader &) = default;
   Trader(Trader &&other) = default;
@@ -24,94 +26,112 @@ public:
               << "is successfully filled\n";
   }
 
-  template <Side side>
-  void notifyFill(OrderStyle style, OrderId orderId, Symbol symbol,
-                  Price fillPrice, Quantity fillQuantity) {
+  template <Side side, OrderStyle style>
+  void notifyFill(OrderId orderId, Symbol symbol, Price fillPrice,
+                  Quantity fillQuantity) {
 
     if constexpr (side == Side::BUY) {
       std::cout << "Fill! " << mTraderId << " "
-                << "BUY " << fillQuantity << " " << symbol << " at "
-                << fillPrice << '\n';
+                << "ORDER_TYPE: " << orderStyle2Str(style) << " BUY "
+                << fillQuantity << " " << symbol << " at " << fillPrice << '\n';
 
       mFilledBuyOrders.emplace_back(Order<side>(
           style, mTraderId, orderId, symbol, fillPrice, fillQuantity));
     } else {
       std::cout << "Fill! " << mTraderId << " "
-                << "SELL " << fillQuantity << " " << symbol << " at "
-                << fillPrice << '\n';
+                << "ORDER_TYPE: " << orderStyle2Str(style) << " SELL "
+                << fillQuantity << " " << symbol << " at " << fillPrice << '\n';
 
       mFilledSellOrders.emplace_back(Order<side>(
           style, mTraderId, orderId, symbol, fillPrice, fillQuantity));
     }
   }
 
-  void notifyCancel(OrderId orderId) {
+  void notifyCancel(OrderId orderId,
+                    OrderCancelReason rsn = OrderCancelReason::CANCEL_REQUEST) {
     // precondition: the order must be in the open order lists
     auto it = mOpenBuyOrders.begin();
     auto end = mOpenBuyOrders.end();
     while (it != end && it->getOrderId() != orderId) {
-      ++it;
+      it++;
     }
 
     if (it != end) {
       std::cout << "Order Cancel! " << mTraderId << " CANCEL "
-                << "BUY " << it->getQuantity() << " " << it->getSymbol()
-                << " at " << it->getPrice() << '\n';
+                << "ORDER_TYPE: " << orderStyle2Str(it->getOrderStyle())
+                << " BUY " << it->getQuantity() << " " << it->getSymbol()
+                << " at " << it->getPrice()
+                << " reason: " << orderCancelReason2Str(rsn) << '\n';
       mOpenBuyOrders.erase(it);
     } else {
       auto it = mOpenSellOrders.begin();
       auto end = mOpenSellOrders.end();
       while (it != end && it->getOrderId() != orderId) {
-        ++it;
+        it++;
       }
 
       std::cout << "Order Cancel! " << mTraderId << " CANCEL "
-                << "SELL " << it->getQuantity() << " " << it->getSymbol()
-                << " at " << it->getPrice() << '\n';
+                << "ORDER_TYPE: " << orderStyle2Str(it->getOrderStyle())
+                << " SELL " << it->getQuantity() << " " << it->getSymbol()
+                << " at " << it->getPrice()
+                << " reason: " << orderCancelReason2Str(rsn) << '\n';
 
       mOpenSellOrders.erase(it);
     }
   }
 
-  template <Side side> void notifyCancel(OrderId orderId) {
+  template <Side side, OrderStyle style>
+  void notifyCancel(OrderId orderId, Symbol symbol, Price price,
+                    Quantity quantity,
+                    OrderCancelReason rsn = OrderCancelReason::CANCEL_REQUEST) {
+
     if constexpr (side == Side::BUY) {
 
-      auto it = mOpenBuyOrders.begin();
-      auto end = mOpenBuyOrders.end();
-      while (it != end && it->getOrderId() != orderId) {
-        ++it;
-      }
-
       std::cout << "Order Cancel! " << mTraderId << " CANCEL "
-                << "BUY " << it->getQuantity() << " " << it->getSymbol()
-                << " at " << it->getPrice() << '\n';
-      mOpenBuyOrders.erase(it);
+                << "ORDER_TYPE: " << orderStyle2Str(style) << " BUY "
+                << quantity << " " << symbol << " at " << price
+                << " reason: " << orderCancelReason2Str(rsn) << '\n';
+
+      if constexpr (style == OrderStyle::LIMIT_ORDER) {
+        auto it = mOpenBuyOrders.begin();
+        auto end = mOpenBuyOrders.end();
+        while (it != end && it->getOrderId() != orderId) {
+          it++;
+        }
+
+        if (it != end) {
+
+          mOpenBuyOrders.erase(it);
+        }
+      }
 
     } else {
-
-      auto it = mOpenSellOrders.begin();
-      auto end = mOpenSellOrders.end();
-      while (it != end && it->getOrderId() != orderId) {
-        ++it;
-      }
-
       std::cout << "Order Cancel! " << mTraderId << " CANCEL "
-                << "SELL " << it->getQuantity() << " " << it->getSymbol()
-                << " at " << it->getPrice() << '\n';
+                << "SELL " << quantity << " " << symbol << " at " << price
+                << " reason: " << orderCancelReason2Str(rsn) << '\n';
+      if constexpr (style == OrderStyle::LIMIT_ORDER) {
+        auto it = mOpenSellOrders.begin();
+        auto end = mOpenSellOrders.end();
+        while (it != end && it->getOrderId() != orderId) {
+          it++;
+        }
 
-      mOpenSellOrders.erase(it);
+        if (it != end) {
+          mOpenSellOrders.erase(it);
+        }
+      }
     }
   }
 
   void notifyCancelReject(OrderId orderId) {
 
     std::cout << "Order Cancel Reject! " << mTraderId << " CANCEL "
-              << "order: " << orderId << "failed" << '\n';
+              << "order: " << orderId << " failed" << '\n';
   }
 
-  template <Side side>
-  void notifyOpen(OrderStyle style, OrderId orderId, Symbol symbol,
-                  Price fillPrice, Quantity fillQuantity) {
+  template <Side side, OrderStyle style>
+  void notifyOpen(OrderId orderId, Symbol symbol, Price fillPrice,
+                  Quantity fillQuantity) {
 
     if constexpr (side == Side::BUY) {
       std::cout << "Order Open! " << mTraderId << " "
@@ -145,6 +165,6 @@ private:
   std::vector<Order<Side::BUY>> mFilledBuyOrders;
   std::vector<Order<Side::SELL>> mFilledSellOrders;
 };
-} // namespace Common
+} // namespace Core
 
 #endif

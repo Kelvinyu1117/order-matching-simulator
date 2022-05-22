@@ -2,7 +2,7 @@
 #define CORE_ORDER_BOOK
 #include <deque>
 #include <map>
-#include <order.h>
+#include <order/order.h>
 #include <types.h>
 #include <unordered_set>
 
@@ -52,7 +52,7 @@ public:
     bool isFound = false;
     auto it = mQueue.begin();
 
-    for (; it != mQueue.end() && !isFound; ++it) {
+    for (; it != mQueue.end() && !isFound; it++) {
       if (it->getTraderId() == id) {
         isFound = true;
       }
@@ -71,7 +71,7 @@ public:
     bool isFound = false;
     auto it = mQueue.begin();
 
-    for (; it != mQueue.end() && !isFound; ++it) {
+    for (; it != mQueue.end() && !isFound; it++) {
       if (it->getOrderId() == orderId) {
         isFound = true;
       }
@@ -89,17 +89,19 @@ public:
   bool erase(OrderId orderId, TraderId traderId) {
     bool isFound = false;
     auto it = mQueue.begin();
+    auto res = it;
 
-    for (; it != mQueue.end() && !isFound; ++it) {
+    for (; it != mQueue.end() && !isFound; it++) {
       if (it->getOrderId() == orderId && it->getTraderId() == traderId) {
         isFound = true;
+        res = it;
       }
     }
 
     if (isFound) {
-      mTraderIds.erase(it->getTraderId());
-      mQueue.erase(it);
-      mTotalQuantity -= it->getQuantity();
+      mTotalQuantity -= res->getQuantity();
+      mTraderIds.erase(res->getTraderId());
+      mQueue.erase(res);
     }
 
     return isFound;
@@ -109,6 +111,7 @@ public:
   bool empty() const { return mQueue.empty(); }
 
   size_t numOfOrders() const { return mQueue.size(); }
+  std::int32_t totalQuantity() const { return mTotalQuantity; }
 
 private:
   std::deque<Order<side>> mQueue;
@@ -179,12 +182,18 @@ public:
     // Definitely it can be optimized by manipulating the reference of the order
     // in the queue and orderId and traderId, something like a multi-index
     // (OrderId, TraderId) to the order, but I dont have time to do it yet
-    for (auto it = mBidSide.begin(); it != mBidSide.end() && isFound; ++it) {
+    for (auto it = mBidSide.begin(); it != mBidSide.end() && !isFound; it++) {
       isFound = it->second.erase(orderId, traderId);
+      if (it->second.empty()) {
+        mBidSide.erase(it);
+      }
     }
 
-    for (auto it = mAskSide.begin(); it != mAskSide.end() && isFound; ++it) {
+    for (auto it = mAskSide.begin(); it != mAskSide.end() && !isFound; it++) {
       isFound = it->second.erase(orderId, traderId);
+      if (it->second.empty()) {
+        mAskSide.erase(it);
+      }
     }
 
     return isFound;

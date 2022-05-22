@@ -5,17 +5,21 @@ using namespace Core;
 void MatchingEngine::addStocks(const std::vector<Symbol> &symbols) {
   for (const auto &symbol : symbols) {
     if (mBookMap.find(symbol) == mBookMap.end()) {
-      mBookMap[symbol] = std::make_unique<OrderBook>();
+      mBookMap[symbol] = std::make_shared<OrderBook>();
     }
   }
 }
 
-const std::unordered_map<std::string, std::unique_ptr<OrderBook>> &
-MatchingEngine::getOrderBookMap() {
+void MatchingEngine::addConfig(std::shared_ptr<MatchingEngineConfig> config) {
+  mConfig = config;
+}
+
+std::unordered_map<std::string, std::shared_ptr<OrderBook>>
+MatchingEngine::getOrderBookMap() const {
   return mBookMap;
 }
 
-bool MatchingEngine::isSelfTradePreventionEnable() {
+bool MatchingEngine::isSelfTradePreventionEnable() const {
   return mConfig && mConfig->selfTradPreventionConfig &&
          mConfig->selfTradPreventionConfig->enable;
 }
@@ -25,7 +29,7 @@ std::uint64_t MatchingEngine::getNextOrderId() {
 }
 
 bool MatchingEngine::matchBuyOrder(ExecutionContext &context,
-                                   std::unique_ptr<OrderBook> &bookPtr,
+                                   std::shared_ptr<OrderBook> &bookPtr,
                                    Order<Side::BUY> &order) {
   if (bookPtr->template getNumOfLevels<Side::SELL>() == 0) {
     return false;
@@ -40,44 +44,56 @@ bool MatchingEngine::matchBuyOrder(ExecutionContext &context,
     return false;
   }
 
-  bool is_done = false;
+  bool isDone = false;
 
-  while (!is_done && px >= best_ask &&
+  while (!isDone && px >= it->first &&
          it != bookPtr->template end<Side::SELL>()) {
+
     auto &orderQueue = it->second;
-
     bool isOrderCompleted = false;
+
     while (!orderQueue.empty() && !isOrderCompleted) {
-      auto &frontOrder = orderQueue.front();
-      auto frontOrderId = frontOrder.getOrderId();
-      auto frontOrderTraderId = frontOrder.getTraderId();
-      auto frontOrderPx = frontOrder.getPrice();
-      auto frontOrderQty = frontOrder.getQuantity();
-      auto matchedQty = std::min(frontOrderQty, amt);
+      if (isSelfTradePreventionEnable() &&
+          orderQueue.front().getTraderId() == order.getTraderId()) {
+        SelfTradeHandler::dispatch<OrderStyle::LIMIT_ORDER, Side::SELL,
+                                   Side::BUY>(
+            mConfig->selfTradPreventionConfig->policy, context, orderQueue,
+            order);
+        isOrderCompleted = !order.getQuantity();
+      } else {
+        auto &frontOrder = orderQueue.front();
+        auto frontOrderId = frontOrder.getOrderId();
+        auto frontOrderTraderId = frontOrder.getTraderId();
+        auto frontOrderPx = frontOrder.getPrice();
+        auto frontOrderQty = frontOrder.getQuantity();
+        auto matchedQty = std::min(frontOrderQty, amt);
 
-      auto fillpx = std::min(frontOrderPx, order.getPrice());
-      context.notifyTrader<Side::SELL, OrderStatus::FILLED>(
-          order.getOrderStyle(), frontOrderTraderId, frontOrderId,
-          order.getSymbol(), frontOrderPx, matchedQty);
+        auto fillpx = std::min(frontOrderPx, order.getPrice());
+        context.notifyTrader<Side::SELL, OrderStyle::LIMIT_ORDER,
+                             OrderStatus::FILLED>(
+            frontOrderTraderId, frontOrderId, order.getSymbol(), frontOrderPx,
+            matchedQty);
 
-      frontOrder.setQuantity(frontOrderQty - matchedQty);
-      if (frontOrder.getQuantity() == 0) {
-        context.notifyTraderAllFilled(frontOrderTraderId, frontOrderId);
-        orderQueue.pop();
+        frontOrder.setQuantity(frontOrderQty - matchedQty);
+        if (frontOrder.getQuantity() == 0) {
+          context.notifyTraderAllFilled(frontOrderTraderId, frontOrderId);
+          orderQueue.pop();
+        }
+
+        context.notifyTrader<Side::BUY, OrderStyle::LIMIT_ORDER,
+                             OrderStatus::FILLED>(
+            order.getTraderId(), order.getOrderId(), order.getSymbol(), fillpx,
+            matchedQty);
+
+        amt = std::max(static_cast<Quantity>(0), amt - matchedQty);
+        order.setQuantity(amt);
+
+        isOrderCompleted = amt == 0;
       }
-
-      context.notifyTrader<Side::BUY, OrderStatus::FILLED>(
-          order.getOrderStyle(), order.getTraderId(), order.getOrderId(),
-          order.getSymbol(), fillpx, matchedQty);
-
-      amt = std::max(static_cast<Quantity>(0), amt - matchedQty);
-      order.setQuantity(amt);
-
-      isOrderCompleted = amt == 0;
     }
 
-    is_done = order.getQuantity() == 0;
-    if (is_done) {
+    isDone = order.getQuantity() == 0;
+    if (isDone) {
       context.notifyTraderAllFilled(order.getTraderId(), order.getOrderId());
     }
     if (orderQueue.empty()) {
@@ -85,11 +101,11 @@ bool MatchingEngine::matchBuyOrder(ExecutionContext &context,
     }
   }
 
-  return is_done;
+  return isDone;
 }
 
 bool MatchingEngine::matchSellOrder(ExecutionContext &context,
-                                    std::unique_ptr<OrderBook> &bookPtr,
+                                    std::shared_ptr<OrderBook> &bookPtr,
                                     Order<Side::SELL> &order) {
 
   bool should_proceed = true;
@@ -107,18 +123,19 @@ bool MatchingEngine::matchSellOrder(ExecutionContext &context,
     return false;
   }
 
-  bool is_done = false;
+  bool isDone = false;
 
-  while (!is_done && px <= best_bid &&
+  while (!isDone && px <= it->first &&
          it != bookPtr->template end<Side::BUY>()) {
     auto &orderQueue = it->second;
-
     bool isOrderCompleted = false;
+
     while (!orderQueue.empty() && !isOrderCompleted) {
 
       if (isSelfTradePreventionEnable() &&
           orderQueue.front().getTraderId() == order.getTraderId()) {
-        SelfTradeHandler::dispatch<Side::BUY, Side::SELL>(
+        SelfTradeHandler::dispatch<OrderStyle::LIMIT_ORDER, Side::BUY,
+                                   Side::SELL>(
             mConfig->selfTradPreventionConfig->policy, context, orderQueue,
             order);
         isOrderCompleted = !order.getQuantity();
@@ -131,18 +148,20 @@ bool MatchingEngine::matchSellOrder(ExecutionContext &context,
         auto matchedQty = std::min(frontOrderQty, amt);
         auto fillpx = std::min(frontOrderPx, order.getPrice());
 
-        context.notifyTrader<Side::BUY, OrderStatus::FILLED>(
-            order.getOrderStyle(), frontOrderTraderId, frontOrderId,
-            order.getSymbol(), fillpx, matchedQty);
+        context.notifyTrader<Side::BUY, OrderStyle::LIMIT_ORDER,
+                             OrderStatus::FILLED>(
+            frontOrderTraderId, frontOrderId, order.getSymbol(), fillpx,
+            matchedQty);
 
         frontOrder.setQuantity(frontOrderQty - matchedQty);
         if (frontOrder.getQuantity() == 0) {
           context.notifyTraderAllFilled(frontOrderTraderId, frontOrderId);
           orderQueue.pop();
         }
-        context.notifyTrader<Side::SELL, OrderStatus::FILLED>(
-            order.getOrderStyle(), order.getTraderId(), order.getOrderId(),
-            order.getSymbol(), fillpx, matchedQty);
+        context.notifyTrader<Side::SELL, OrderStyle::LIMIT_ORDER,
+                             OrderStatus::FILLED>(
+            order.getTraderId(), order.getOrderId(), order.getSymbol(), fillpx,
+            matchedQty);
 
         amt = std::max(static_cast<Quantity>(0), amt - matchedQty);
 
@@ -151,8 +170,8 @@ bool MatchingEngine::matchSellOrder(ExecutionContext &context,
       }
     }
 
-    is_done = order.getQuantity() == 0;
-    if (is_done) {
+    isDone = order.getQuantity() == 0;
+    if (isDone) {
       context.notifyTraderAllFilled(order.getTraderId(), order.getOrderId());
     }
 
@@ -161,5 +180,5 @@ bool MatchingEngine::matchSellOrder(ExecutionContext &context,
     }
   }
 
-  return is_done;
+  return isDone;
 }

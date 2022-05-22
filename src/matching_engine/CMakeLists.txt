@@ -6,7 +6,7 @@ target_include_directories(matching_engine PUBLIC "${OrderMatchingSimulator_SOUR
 target_include_directories(matching_engine PUBLIC "${OrderMatchingSimulator_SOURCE_DIR}/lib/")
 
 
-target_link_libraries(matching_engine order_book execution_context)
+target_link_libraries(matching_engine order order_book execution_context)
 
 install(
     TARGETS matching_engine

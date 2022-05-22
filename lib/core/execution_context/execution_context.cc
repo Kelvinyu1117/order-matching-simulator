@@ -12,7 +12,7 @@ void ExecutionContext::notifyTraderAllFilled(TraderId traderId,
     mTraderMap[traderId]->notifyAllFilled(orderId);
   }
 }
-const std::unordered_map<TraderId, std::shared_ptr<Trader>> &
+std::unordered_map<TraderId, std::shared_ptr<Trader>>
 ExecutionContext::getTraderMap() {
   return mTraderMap;
 }

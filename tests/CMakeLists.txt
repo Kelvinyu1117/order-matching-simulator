@@ -11,13 +11,15 @@ enable_testing()
 
 add_executable(
     OrderMatchingSimulatorTest
-    test_matching_engine.cpp
-    test_order_book.cpp
+    test_main.cc
+    test_matching_engine.cc
+    test_order_book.cc
 )
 
 target_link_libraries(OrderMatchingSimulatorTest matching_engine order_book gtest_main)
 target_include_directories(OrderMatchingSimulatorTest PUBLIC "${OrderMatchingSimulator_SOURCE_DIR}/include")
 target_include_directories(OrderMatchingSimulatorTest PUBLIC "${OrderMatchingSimulator_SOURCE_DIR}/lib/core")
+target_include_directories(OrderMatchingSimulatorTest PUBLIC "${OrderMatchingSimulator_SOURCE_DIR}/src")
 
 
 
